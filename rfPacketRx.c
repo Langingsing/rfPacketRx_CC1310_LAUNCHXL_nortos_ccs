@@ -31,9 +31,6 @@
  */
 
 /***** Includes *****/
-/* Standard C Libraries */
-//#include <stdlib.h>
-
 /* TI Drivers */
 #include <ti/drivers/rf/RF.h>
 #include <ti/drivers/PIN.h>
@@ -69,43 +66,8 @@
 static void callback(RF_Handle h, RF_CmdHandle ch, RF_EventMask e);
 
 /***** Variable declarations *****/
-static RF_Object rfObject;
-static RF_Handle rfHandle;
-
 /* Pin driver handle */
 static PIN_Handle ledPinHandle;
-static PIN_State ledPinState;
-
-static SerialPort serialPort;
-
-/* Buffer which contains all Data Entries for receiving data.
- * Pragmas are needed to make sure this buffer is 4 byte aligned (requirement from the RF Core) */
-#if defined(__TI_COMPILER_VERSION__)
-#pragma DATA_ALIGN (rxDataEntryBuffer, 4);
-static uint8_t
-rxDataEntryBuffer[RF_QUEUE_DATA_ENTRY_BUFFER_SIZE(NUM_DATA_ENTRIES,
-                                                  MAX_LENGTH,
-                                                  NUM_APPENDED_BYTES)];
-#elif defined(__IAR_SYSTEMS_ICC__)
-#pragma data_alignment = 4
-static uint8_t
-rxDataEntryBuffer[RF_QUEUE_DATA_ENTRY_BUFFER_SIZE(NUM_DATA_ENTRIES,
-                                                  MAX_LENGTH,
-                                                  NUM_APPENDED_BYTES)];
-#elif defined(__GNUC__)
-static uint8_t
-        rxDataEntryBuffer[RF_QUEUE_DATA_ENTRY_BUFFER_SIZE(NUM_DATA_ENTRIES,
-                                                          MAX_LENGTH,
-                                                          NUM_APPENDED_BYTES)]
-        __attribute__((aligned(4)));
-#else
-#error This compiler is not supported.
-#endif
-
-/* Receive dataQueue for RF Core to fill in data */
-static rfc_dataEntryGeneral_t *currentDataEntry;
-static uint8_t packetLength;
-static uint8_t *packetDataPointer;
 
 static uint8_t packet[MAX_LENGTH + NUM_APPENDED_BYTES - 1]; /* The length byte is stored in a separate variable */
 static volatile bool came = false;
@@ -126,16 +88,40 @@ void *mainThread(void *arg0) {
     RF_Params_init(&rfParams);
 
     /* Open LED pins */
+    static PIN_State ledPinState;
     ledPinHandle = PIN_open(&ledPinState, pinTable);
     if (ledPinHandle == NULL) {
         while (1);
     }
 
-    serialPort = SerialPort_open(NULL);
+    SerialPort serialPort = SerialPort_open(NULL);
     SerialPort_write(serialPort, "init", 4);
     SerialPort_write(serialPort, "init2", 5);
 
-    dataQueue_t dataQueue;
+    static dataQueue_t dataQueue;
+    /* Buffer which contains all Data Entries for receiving data.
+ * Pragmas are needed to make sure this buffer is 4 byte aligned (requirement from the RF Core) */
+#if defined(__TI_COMPILER_VERSION__)
+#pragma DATA_ALIGN (rxDataEntryBuffer, 4);
+    static uint8_t
+    rxDataEntryBuffer[RF_QUEUE_DATA_ENTRY_BUFFER_SIZE(NUM_DATA_ENTRIES,
+                                                      MAX_LENGTH,
+                                                      NUM_APPENDED_BYTES)];
+#elif defined(__IAR_SYSTEMS_ICC__)
+#pragma data_alignment = 4
+    static uint8_t
+    rxDataEntryBuffer[RF_QUEUE_DATA_ENTRY_BUFFER_SIZE(NUM_DATA_ENTRIES,
+                                                      MAX_LENGTH,
+                                                      NUM_APPENDED_BYTES)];
+#elif defined(__GNUC__)
+    static uint8_t
+            rxDataEntryBuffer[RF_QUEUE_DATA_ENTRY_BUFFER_SIZE(NUM_DATA_ENTRIES,
+                                                              MAX_LENGTH,
+                                                              NUM_APPENDED_BYTES)]
+            __attribute__((aligned(4)));
+#else
+#error This compiler is not supported.
+#endif
     if (RFQueue_defineQueue(&dataQueue,
                             rxDataEntryBuffer,
                             sizeof(rxDataEntryBuffer),
@@ -156,6 +142,9 @@ void *mainThread(void *arg0) {
     RF_cmdPropRx.maxPktLen = MAX_LENGTH;
     RF_cmdPropRx.pktConf.bRepeatOk = 1;
     RF_cmdPropRx.pktConf.bRepeatNok = 1;
+
+    static RF_Object rfObject;
+    RF_Handle rfHandle;
 
     /* Request access to the radio */
 #if defined(DeviceFamily_CC26X0R2)
@@ -269,14 +258,16 @@ void callback(RF_Handle h, RF_CmdHandle ch, RF_EventMask e) {
                            !PIN_getOutputValue(Board_PIN_LED2));
 
         /* Get current unhandled data entry */
-        currentDataEntry = RFQueue_getDataEntry();
+        rfc_dataEntryGeneral_t *currentDataEntry = RFQueue_getDataEntry();
         came = true;
+
+        /* Receive dataQueue for RF Core to fill in data */
+        uint8_t packetLength = *(uint8_t *) (&currentDataEntry->data);
 
         /* Handle the packet data, located at &currentDataEntry->data:
          * - Length is the first byte with the current configuration
          * - Data starts from the second byte */
-        packetLength = *(uint8_t *) (&currentDataEntry->data);
-        packetDataPointer = (uint8_t *) (&currentDataEntry->data + 1);
+        uint8_t *packetDataPointer = &currentDataEntry->data + 1;
 
         /* Copy the payload + the status byte to the packet variable */
         memcpy(packet, packetDataPointer, (packetLength + 1));
