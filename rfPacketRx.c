@@ -49,6 +49,7 @@
 #include "RFQueue.h"
 #include "smartrf_settings/smartrf_settings.h"
 #include "SerialPort.h"
+#include "utils.h"
 
 /***** Defines *****/
 
@@ -161,11 +162,12 @@ void *mainThread(void *arg0) {
                                                 RF_PriorityNormal, &callback,
                                                 RF_EventRxEntryDone);
     SerialPort_write(serialPort, "mainloop", 8);
-    char buf[32];
+    char buffer[32] = "cb: ";
     uint32_t cnt;
     for (cnt = 0;;) {
         if (came) {
-            SerialPort_write(serialPort, "cb:", 3);
+            size_t len = utils_long2str(cnt, buffer + 4, 10);
+            SerialPort_write(serialPort, buffer, 4 + len);
             cnt++;
             came = false;
         }
@@ -270,7 +272,7 @@ void callback(RF_Handle h, RF_CmdHandle ch, RF_EventMask e) {
         uint8_t *packetDataPointer = &currentDataEntry->data + 1;
 
         /* Copy the payload + the status byte to the packet variable */
-        memcpy(packet, packetDataPointer, (packetLength + 1));
+        memcpy(packet, packetDataPointer, packetLength + 1);
 
         RFQueue_nextEntry();
     }

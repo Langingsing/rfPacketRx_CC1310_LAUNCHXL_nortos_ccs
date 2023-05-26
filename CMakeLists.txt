@@ -19,7 +19,9 @@ add_executable(rfPacketRx_CC1310_LAUNCHXL_nortos_ccs
         RFQueue.c
         RFQueue.h
         SerialPort.c
-        SerialPort.h)
+        SerialPort.h
+        utils.c
+        utils.h)
 
 include_directories(D:/Install_software/ti/ccs1230/simplelink_cc13x0_sdk_4_20_02_07/source)
 include_directories(D:/Install_software/ti/ccs1230/simplelink_cc13x0_sdk_4_20_02_07/kernel/nortos)
