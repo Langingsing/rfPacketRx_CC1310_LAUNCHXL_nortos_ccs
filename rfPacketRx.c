@@ -70,8 +70,7 @@ static void callback(RF_Handle h, RF_CmdHandle ch, RF_EventMask e);
 /* Pin driver handle */
 static PIN_Handle ledPinHandle;
 
-static uint8_t packet[MAX_LENGTH + NUM_APPENDED_BYTES - 1]; /* The length byte is stored in a separate variable */
-static volatile uint8_t packetLength = 0; // 0 for no packet
+static volatile uint8_t packet[MAX_LENGTH + NUM_APPENDED_BYTES]; /* The length byte is stored in a separate variable */
 
 /*
  * Application LED pin configuration table:
@@ -164,9 +163,10 @@ void *mainThread(void *arg0) {
                                                 RF_EventRxEntryDone);
 
     for (;;) {
-        if (packetLength > 0) {
-            SerialPort_write(serialPort, packet, packetLength);
-            packetLength = 0;
+        uint8_t payloadLength = packet[0];
+        if (payloadLength > 0) {
+            SerialPort_write(serialPort, packet, payloadLength + sizeof payloadLength);
+            packet[0] = 0;
         }
     }
 
@@ -260,15 +260,10 @@ void callback(RF_Handle h, RF_CmdHandle ch, RF_EventMask e) {
         rfc_dataEntryGeneral_t *currentDataEntry = RFQueue_getDataEntry();
 
         /* Receive dataQueue for RF Core to fill in data */
-        packetLength = currentDataEntry->data;
-
-        /* Handle the packet data, located at &currentDataEntry->data:
-         * - Length is the first byte with the current configuration
-         * - Data starts from the second byte */
-        uint8_t *packetDataPointer = &currentDataEntry->data + 1;
+        uint8_t payloadLength = currentDataEntry->data;
 
         /* Copy the payload + the status byte to the packet variable */
-        memcpy(packet, packetDataPointer, packetLength + 1);
+        memcpy(packet, &currentDataEntry->data, payloadLength + sizeof payloadLength);
 
         RFQueue_nextEntry();
     }
