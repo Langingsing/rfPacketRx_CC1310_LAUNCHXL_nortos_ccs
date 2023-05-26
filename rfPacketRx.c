@@ -32,11 +32,13 @@
 
 /***** Includes *****/
 /* Standard C Libraries */
-#include <stdlib.h>
+//#include <stdlib.h>
 
 /* TI Drivers */
 #include <ti/drivers/rf/RF.h>
 #include <ti/drivers/PIN.h>
+#include <ti/devices/cc13x0/driverlib/rf_prop_mailbox.h>
+#include <ti/devices/cc13x0/driverlib/rf_data_entry.h>
 
 /* Driverlib Header files */
 // @formatter:off

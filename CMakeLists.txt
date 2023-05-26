@@ -26,4 +26,3 @@ include_directories(D:/Install_software/ti/ccs1230/simplelink_cc13x0_sdk_4_20_02
 include_directories(D:/Install_software/ti/ccs1230/simplelink_cc13x0_sdk_4_20_02_07/kernel/nortos/posix)
 include_directories(D:/Install_software/ti/ccs1230/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include)
 include_directories(D:/Install_software/ti/ccs1230/simplelink_cc13x0_sdk_4_20_02_07/source/ti/devices)
-include_directories(D:/Install_software/ti/ccs1230/simplelink_cc13x0_sdk_4_20_02_07/source/ti/devices/cc13x0/driverlib)
