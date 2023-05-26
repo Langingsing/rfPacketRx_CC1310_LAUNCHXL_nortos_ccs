@@ -71,7 +71,7 @@ static void callback(RF_Handle h, RF_CmdHandle ch, RF_EventMask e);
 static PIN_Handle ledPinHandle;
 
 static uint8_t packet[MAX_LENGTH + NUM_APPENDED_BYTES - 1]; /* The length byte is stored in a separate variable */
-static volatile bool came = false;
+static volatile uint8_t packetLength = 0; // 0 for no packet
 
 /*
  * Application LED pin configuration table:
@@ -96,8 +96,9 @@ void *mainThread(void *arg0) {
     }
 
     SerialPort serialPort = SerialPort_open(NULL);
-    SerialPort_write(serialPort, "init", 4);
-    SerialPort_write(serialPort, "init2", 5);
+    char const helloMsg[] = "hello";
+    SerialPort_write(serialPort, helloMsg, sizeof helloMsg - 1);
+    SerialPort_write(serialPort, helloMsg, sizeof helloMsg - 1);
 
     static dataQueue_t dataQueue;
     /* Buffer which contains all Data Entries for receiving data.
@@ -161,15 +162,11 @@ void *mainThread(void *arg0) {
     RF_EventMask terminationReason = RF_postCmd(rfHandle, (RF_Op *) &RF_cmdPropRx,
                                                 RF_PriorityNormal, &callback,
                                                 RF_EventRxEntryDone);
-    SerialPort_write(serialPort, "mainloop", 8);
-    char buffer[32] = "cb: ";
-    uint32_t cnt;
-    for (cnt = 0;;) {
-        if (came) {
-            size_t len = utils_long2str(cnt, buffer + 4, 10);
-            SerialPort_write(serialPort, buffer, 4 + len);
-            cnt++;
-            came = false;
+
+    for (;;) {
+        if (packetLength > 0) {
+            SerialPort_write(serialPort, packet, packetLength);
+            packetLength = 0;
         }
     }
 
@@ -261,10 +258,9 @@ void callback(RF_Handle h, RF_CmdHandle ch, RF_EventMask e) {
 
         /* Get current unhandled data entry */
         rfc_dataEntryGeneral_t *currentDataEntry = RFQueue_getDataEntry();
-        came = true;
 
         /* Receive dataQueue for RF Core to fill in data */
-        uint8_t packetLength = *(uint8_t *) (&currentDataEntry->data);
+        packetLength = currentDataEntry->data;
 
         /* Handle the packet data, located at &currentDataEntry->data:
          * - Length is the first byte with the current configuration
