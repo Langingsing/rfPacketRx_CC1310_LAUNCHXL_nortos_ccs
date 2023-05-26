@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.25)
 project(rfPacketRx_CC1310_LAUNCHXL_nortos_ccs C)
 
-set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD 90)
 
 include_directories(.)
 include_directories(smartrf_settings)

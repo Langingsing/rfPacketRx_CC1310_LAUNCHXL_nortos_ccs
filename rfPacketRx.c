@@ -51,6 +51,7 @@
 /* Application Header files */
 #include "RFQueue.h"
 #include "smartrf_settings/smartrf_settings.h"
+#include "SerialPort.h"
 
 /***** Defines *****/
 
@@ -74,6 +75,8 @@ static RF_Handle rfHandle;
 /* Pin driver handle */
 static PIN_Handle ledPinHandle;
 static PIN_State ledPinState;
+
+static SerialPort serialPort;
 
 /* Buffer which contains all Data Entries for receiving data.
  * Pragmas are needed to make sure this buffer is 4 byte aligned (requirement from the RF Core) */
@@ -100,13 +103,12 @@ static uint8_t
 #endif
 
 /* Receive dataQueue for RF Core to fill in data */
-static dataQueue_t dataQueue;
 static rfc_dataEntryGeneral_t *currentDataEntry;
 static uint8_t packetLength;
 static uint8_t *packetDataPointer;
 
-
 static uint8_t packet[MAX_LENGTH + NUM_APPENDED_BYTES - 1]; /* The length byte is stored in a separate variable */
+static volatile bool came = false;
 
 /*
  * Application LED pin configuration table:
@@ -129,6 +131,11 @@ void *mainThread(void *arg0) {
         while (1);
     }
 
+    serialPort = SerialPort_open(NULL);
+    SerialPort_write(serialPort, "init", 4);
+    SerialPort_write(serialPort, "init2", 5);
+
+    dataQueue_t dataQueue;
     if (RFQueue_defineQueue(&dataQueue,
                             rxDataEntryBuffer,
                             sizeof(rxDataEntryBuffer),
@@ -161,10 +168,21 @@ void *mainThread(void *arg0) {
     RF_postCmd(rfHandle, (RF_Op *) &RF_cmdFs, RF_PriorityNormal, NULL, 0);
 
     /* Enter RX mode and stay forever in RX */
-    RF_EventMask terminationReason = RF_runCmd(rfHandle, (RF_Op *) &RF_cmdPropRx,
-                                               RF_PriorityNormal, &callback,
-                                               RF_EventRxEntryDone);
+    RF_EventMask terminationReason = RF_postCmd(rfHandle, (RF_Op *) &RF_cmdPropRx,
+                                                RF_PriorityNormal, &callback,
+                                                RF_EventRxEntryDone);
+    SerialPort_write(serialPort, "mainloop", 8);
+    char buf[32];
+    uint32_t cnt;
+    for (cnt = 0;;) {
+        if (came) {
+            SerialPort_write(serialPort, "cb:", 3);
+            cnt++;
+            came = false;
+        }
+    }
 
+/*
     switch (terminationReason) {
         case RF_EventLastCmdDone:
             // A stand-alone radio operation command or the last radio
@@ -186,6 +204,7 @@ void *mainThread(void *arg0) {
             // Uncaught error event
             while (1);
     }
+*/
 
     uint32_t cmdStatus = ((volatile RF_Op *) &RF_cmdPropRx)->status;
     switch (cmdStatus) {
@@ -251,6 +270,7 @@ void callback(RF_Handle h, RF_CmdHandle ch, RF_EventMask e) {
 
         /* Get current unhandled data entry */
         currentDataEntry = RFQueue_getDataEntry();
+        came = true;
 
         /* Handle the packet data, located at &currentDataEntry->data:
          * - Length is the first byte with the current configuration
