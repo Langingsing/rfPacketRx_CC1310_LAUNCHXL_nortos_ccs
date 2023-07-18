@@ -1,3 +1,9 @@
+# 开发说明
+本项目在Code Composer Studio的rfPacketRx示例程序基础上，修改了rfPacketRx.c，添加了SerialPort.c/.h和utils.c/.h。
+
+
+以下为原rfPacketRx示例程序README内容：
+
 # rfPacketRx
 ---
 
